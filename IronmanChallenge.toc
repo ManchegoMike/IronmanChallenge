@@ -1,0 +1,11 @@
+## Interface: 11305
+## Title: Ironman Challenge|cFF00FF00 2.0.0|r
+## Author: ManchegoMike
+## Notes: Hardcore, self-found, only white/gray gear, no talents, no primary profs, no potions/healthstones, no external buffs
+## Version: 2.0.0
+## RequiredDeps:
+## SavedVariablesPerCharacter: IronmanUserData
+
+localization.lua
+adapter.lua
+main.lua
