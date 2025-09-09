@@ -119,6 +119,8 @@ end)
 function ns:parseCommand(str)
     local p1, p2, match
 
+    ns:initDB()
+
     p1, p2, match = str:find("^(%d+)$")
     if p1 then
         local n = tonumber(match)
@@ -146,14 +148,64 @@ function ns:parseCommand(str)
         return
     end
 
+    local function setPets(tf)
+        if tf == nil then
+            IronmanUserData.AllowPets = not IronmanUserData.AllowPets
+        else
+            IronmanUserData.AllowPets = tf
+        end
+        ns:success(IronmanUserData.AllowPets and L.pets_on or L.pets_off)
+    end
+
+    p1, p2, match = str:find("^pets? *(%a*)$")
+    if p1 then
+        match = match:lower()
+        if match == 'on' then
+            setPets(true)
+        elseif match == 'off' then
+            setPets(false)
+        else
+            setPets(nil)
+        end
+        return
+    end
+
+    local function setProfs(tf)
+        if tf == nil then
+            IronmanUserData.AllowProfs = not IronmanUserData.AllowProfs
+        else
+            IronmanUserData.AllowProfs = tf
+        end
+        ns:success(IronmanUserData.AllowProfs and L.profs_on or L.profs_off)
+    end
+
+    p1, p2, match = str:find("^profs? *(%a*)$")
+    if p1 then
+        match = match:lower()
+        if match == 'on' then
+            setProfs(true)
+        elseif match == 'off' then
+            setProfs(false)
+        else
+            setProfs(nil)
+        end
+        return
+    end
+
     local color = 'ffd000'
+
+    local function currentlyOnOrOff(tf)
+        return " (" .. (tf and L.currently_on or L.currently_off) .. ")"
+    end
 
     print(' ')
     print(ns:colorText('ff8000', L.title))
     print(L.description)
     print(' ')
-    print(ns:colorText(color, "/ironman {N}")  .. " - " .. L.cmdln_n)
-    print(ns:colorText(color, "/ironman on/off")  .. " - " .. L.cmdln_on_off)
+    print(ns:colorText(color, "/iron {N}")  .. " - " .. L.cmdln_n)
+    print(ns:colorText(color, "/iron on/off")  .. " - " .. L.cmdln_on_off .. currentlyOnOrOff(not IronmanUserData.Suppress))
+    print(ns:colorText(color, "/iron pet [on/off]")  .. " - " .. L.cmdln_pets .. currentlyOnOrOff(IronmanUserData.AllowPets))
+    print(ns:colorText(color, "/iron prof [on/off]")  .. " - " .. L.cmdln_profs .. currentlyOnOrOff(IronmanUserData.AllowProfs))
     print(' ')
     print(L.disclaimer)
     print(' ')
@@ -188,12 +240,13 @@ end
 
 function ns:initDB(force)
     if force or not IronmanUserData then
-        IronmanUserData = {
-            DeathCount = 0,
-            Interval = 15,
-            Suppress = false,
-        }
+        IronmanUserData = {}
     end
+    if IronmanUserData.DeathCount == nil then IronmanUserData.DeathCount = 0     end
+    if IronmanUserData.Interval   == nil then IronmanUserData.Interval   = 15    end
+    if IronmanUserData.Suppress   == nil then IronmanUserData.Suppress   = false end
+    if IronmanUserData.AllowPets  == nil then IronmanUserData.AllowPets  = false end
+    if IronmanUserData.AllowProfs == nil then IronmanUserData.AllowProfs = true  end
 end
 
 function ns:playSound(path)

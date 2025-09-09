@@ -26,11 +26,11 @@ setmetatable(L, {
             rawset(t, k, localeTable[k])
             return localeTable[k]
         elseif ns.enUS[k] then
-            print("Fallback to enUS for key:", k)
+            --print("Fallback to enUS for key:", k)
             rawset(t, k, ns.enUS[k])
             return ns.enUS[k]
         else
-            print("Missing translation for key:", k)
+            --print("Missing translation for key:", k)
             rawset(t, k, k)
             return k
         end
@@ -66,9 +66,17 @@ ns["enUS"] = {
 
     title = "THE IRONMAN CHALLENGE",
     prefix = "IRONMAN: ",
-    description = "Hardcore, no mail, no auction house, only white or gray gear, no talents, no primary professions, no potions, no healthstones, no food or scroll buffs, no external buffs, self-buff spells are OK.",
+    description = "Hardcore, self-found (no auction house, no mail, no trading), only white or gray gear, no talents, no pets, no primary professions, no potions, no healthstones, no food or scroll buffs, no external buffs, self-buff spells are OK.",
+    currently_on = "currently ON",
+    currently_off = "currently OFF",
     cmdln_n = "Checks every {N} seconds (15 by default)",
-    cmdln_on_off = "Start/stop periodic checking (on by default)",
+    cmdln_on_off = "Start/stop periodic checking",
+    cmdln_pets = "Allow/forbid pets",
+    cmdln_profs = "Allow/forbid secondary professions",
+    pets_on = "Pets are now allowed",
+    pets_off = "Pets are now forbidden",
+    profs_on = "Secondary professions are now allowed",
+    profs_off = "Secondary professions are now forbidden",
     disclaimer = "Due to the limited nature of the WoW API, it's difficult to determine whether a given buff is OK or not. If someone else buffs you, the addon can tell you about that; and it can tell you to remove scroll buffs. But it cannot warn you about buffs from alchemy. HOTs from other players are considered buffs, so it will warn you about those.",
     err_seconds_ij = function(i, j) return "Seconds must be between " .. i .. " and " .. j end,
     checking_every_n = function(n) return "Now checking every " .. n .. " seconds" end,
