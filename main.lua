@@ -100,7 +100,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "UNIT_AURA" then
         ns:checkAll()
     elseif event == "UNIT_PET" then
-        ns:checkPets()
+        adapter:after(0.5, function()
+            ns:checkPets()
+        end)
     elseif event == "MAIL_SHOW" then
         ns:playSound(ERROR_SOUND_FILE)
         ns:flash(L.err_no_mail)
@@ -110,7 +112,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         ns:flash(L.err_no_ah)
         ns:fail(L.err_no_ah)
     elseif event == "LEARNED_SPELL_IN_TAB" then
-        ns:checkProfessions()
+        adapter:after(0.5, function()
+            ns:checkProfessions()
+        end)
     end
 end)
 
@@ -177,29 +181,6 @@ function ns:parseCommand(str)
         return
     end
 
-    local function setProfs(tf)
-        if tf == nil then
-            IronmanUserData.AllowProfs = not IronmanUserData.AllowProfs
-        else
-            IronmanUserData.AllowProfs = tf
-        end
-        ns:success(IronmanUserData.AllowProfs and L.profs_on or L.profs_off)
-        ns:checkProfessions()
-    end
-
-    p1, p2, match = str:find("^profs? *(%a*)$")
-    if p1 then
-        match = match:lower()
-        if match == 'on' then
-            setProfs(true)
-        elseif match == 'off' then
-            setProfs(false)
-        else
-            setProfs(nil)
-        end
-        return
-    end
-
     local color = 'ffd000'
 
     local function currentlyOnOrOff(tf)
@@ -213,7 +194,6 @@ function ns:parseCommand(str)
     print(ns:colorText(color, "/iron {N}")  .. " - " .. L.cmdln_n)
     print(ns:colorText(color, "/iron on/off")  .. " - " .. L.cmdln_on_off .. currentlyOnOrOff(not IronmanUserData.Suppress))
     print(ns:colorText(color, "/iron pet [on/off]")  .. " - " .. L.cmdln_pets .. currentlyOnOrOff(IronmanUserData.AllowPets))
-    print(ns:colorText(color, "/iron prof [on/off]")  .. " - " .. L.cmdln_profs .. currentlyOnOrOff(IronmanUserData.AllowProfs))
     print(' ')
     print(L.disclaimer)
     print(' ')
@@ -254,7 +234,6 @@ function ns:initDB(force)
     if IronmanUserData.Interval   == nil then IronmanUserData.Interval   = 15    end
     if IronmanUserData.Suppress   == nil then IronmanUserData.Suppress   = false end
     if IronmanUserData.AllowPets  == nil then IronmanUserData.AllowPets  = false end
-    if IronmanUserData.AllowProfs == nil then IronmanUserData.AllowProfs = true  end
 end
 
 function ns:playSound(path)
@@ -374,10 +353,6 @@ function ns:checkProfessions()
     if nPrimary > 0 then
         ns:fail(L.err_unlearn_n_profs(nPrimary))
         return nPrimary
-    end
-    if nSecondary > 0 and not IronmanUserData.AllowProfs then
-        ns:fail(L.err_unlearn_n_sec_profs(nSecondary))
-        return nSecondary
     end
     return 0
 end

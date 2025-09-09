@@ -90,7 +90,6 @@ ns["enUS"] = {
     err_you_cannot_use_s = function(link) return "You cannot use " .. link end,
     err_reset_talents = "Reset your talents",
     err_unlearn_n_profs = function(n) return n==1 and ("Unlearn your primary profession") or ("Unlearn your primary professions") end,
-    err_unlearn_n_sec_profs = function(n) return n==1 and ("Unlearn your secondary profession") or ("Unlearn your secondary professions") end,
     err_buff_external = function(s) return "Remove external buff: " .. s end,
     err_buff_disallowed = function(s) return "Remove disallowed buff: " .. s end,
     err_you_died = "You have died",
