@@ -96,13 +96,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == 'PLAYER_DEAD' then
         ns:died()
     elseif event == 'BAG_UPDATE_DELAYED' then
-        ns:checkAll()
+        ns:checkAllDelayed()
     elseif event == "UNIT_AURA" then
-        ns:checkAll()
+        ns:checkAllDelayed()
     elseif event == "UNIT_PET" then
-        adapter:after(0.5, function()
-            ns:checkPets()
-        end)
+        ns:checkAllDelayed()
     elseif event == "MAIL_SHOW" then
         ns:playSound(ERROR_SOUND_FILE)
         ns:flash(L.err_no_mail)
@@ -112,9 +110,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         ns:flash(L.err_no_ah)
         ns:fail(L.err_no_ah)
     elseif event == "LEARNED_SPELL_IN_TAB" then
-        adapter:after(0.5, function()
-            ns:checkProfessions()
-        end)
+        ns:checkAllDelayed()
     end
 end)
 
@@ -259,6 +255,11 @@ end
 
 function ns:flash(text)
     UIErrorsFrame:AddMessage(text, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8);
+end
+
+function ns:checkAllDelayed(nSeconds)
+    nSeconds = nSeconds or 0.5
+    adapter:after(nSeconds, ns.checkAll)
 end
 
 function ns:checkAll()
