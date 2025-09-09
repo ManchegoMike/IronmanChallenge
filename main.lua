@@ -85,8 +85,10 @@ eventFrame:RegisterEvent("PLAYER_DEAD");
 eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED");
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED");
 eventFrame:RegisterEvent("UNIT_AURA")
+eventFrame:RegisterEvent("UNIT_PET")
 eventFrame:RegisterEvent("MAIL_SHOW")
 eventFrame:RegisterEvent("AUCTION_HOUSE_SHOW")
+eventFrame:RegisterEvent("LEARNED_SPELL_IN_TAB")
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == 'PLAYER_LOGIN' then
@@ -97,6 +99,8 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         ns:checkAll()
     elseif event == "UNIT_AURA" then
         ns:checkAll()
+    elseif event == "UNIT_PET" then
+        ns:checkPets()
     elseif event == "MAIL_SHOW" then
         ns:playSound(ERROR_SOUND_FILE)
         ns:flash(L.err_no_mail)
@@ -105,6 +109,8 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         ns:playSound(ERROR_SOUND_FILE)
         ns:flash(L.err_no_ah)
         ns:fail(L.err_no_ah)
+    elseif event == "LEARNED_SPELL_IN_TAB" then
+        ns:checkProfessions()
     end
 end)
 
@@ -155,6 +161,7 @@ function ns:parseCommand(str)
             IronmanUserData.AllowPets = tf
         end
         ns:success(IronmanUserData.AllowPets and L.pets_on or L.pets_off)
+        ns:checkPets()
     end
 
     p1, p2, match = str:find("^pets? *(%a*)$")
@@ -177,6 +184,7 @@ function ns:parseCommand(str)
             IronmanUserData.AllowProfs = tf
         end
         ns:success(IronmanUserData.AllowProfs and L.profs_on or L.profs_off)
+        ns:checkProfessions()
     end
 
     p1, p2, match = str:find("^profs? *(%a*)$")
@@ -283,6 +291,7 @@ function ns:checkAll()
     n = n + ns:checkInventory()
     n = n + ns:checkTalents()
     n = n + ns:checkProfessions()
+    n = n + ns:checkPets()
     n = n + ns:checkBuffs()
     if n > 0 then
         print(' ')
@@ -292,6 +301,17 @@ function ns:checkAll()
     end
     _lastErrorCount = n
     _secondsSinceLastUpdate = 0
+end
+
+function ns:checkDeath()
+    local count = 0
+    if IronmanUserData and IronmanUserData.DeathCount and IronmanUserData.DeathCount >= 0 then
+        count = IronmanUserData.DeathCount
+    end
+    if count > 0 then
+        ns:fail(L.err_you_died)
+    end
+    return (count > 0 and 1 or 0)
 end
 
 function ns:checkGear()
@@ -350,11 +370,24 @@ function ns:checkTalents()
 end
 
 function ns:checkProfessions()
-    local n = adapter:getNumPrimaryProfessions()
-    if n > 0 then
-        ns:fail(L.err_unlearn_n_profs(n))
+    local nPrimary, nSecondary = adapter:getNumProfessions()
+    if nPrimary > 0 then
+        ns:fail(L.err_unlearn_n_profs(nPrimary))
+        return nPrimary
     end
-    return n
+    if nSecondary > 0 and not IronmanUserData.AllowProfs then
+        ns:fail(L.err_unlearn_n_sec_profs(nSecondary))
+        return nSecondary
+    end
+    return 0
+end
+
+function ns:checkPets()
+    if UnitExists("pet") and not IronmanUserData.AllowPets then
+        ns:fail(L.err_pet)
+        return 1
+    end
+    return 0
 end
 
 function ns:checkBuffs()
@@ -372,15 +405,4 @@ function ns:checkBuffs()
         end
     end
     return errorcount
-end
-
-function ns:checkDeath()
-    local count = 0
-    if IronmanUserData and IronmanUserData.DeathCount and IronmanUserData.DeathCount >= 0 then
-        count = IronmanUserData.DeathCount
-    end
-    if count > 0 then
-        ns:fail(L.err_you_died)
-    end
-    return (count > 0 and 1 or 0)
 end

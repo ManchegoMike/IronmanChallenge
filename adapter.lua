@@ -21,6 +21,25 @@ local L = ns.L
 ns.adapter = {}
 local adapter = ns.adapter
 
+local PRIMARY_PROF_SPELLS = {
+    2259,   -- Alchemy
+    2018,   -- Blacksmithing
+    7411,   -- Enchanting
+    4036,   -- Engineering
+    2366,   -- Herbalism
+    45357,  -- Inscription (WotLK only, safe to include)
+    2108,   -- Leatherworking
+    2575,   -- Mining
+    8613,   -- Skinning
+    3908,   -- Tailoring
+}
+
+local SECONDARY_PROF_SPELLS = {
+    2550,   -- Cooking
+    3273,   -- First Aid
+    7620,   -- Fishing
+}
+
 -- Feature detection -----------------------------------------------------------
 
 adapter.isModern  = false
@@ -140,12 +159,11 @@ function adapter:getBuff(unit, index)
 end
 
 function adapter:getBuffs(unit)
-    local buffs = nil
+    local buffs = {}
     local i = 1
     while true do
         local buff = adapter:getBuff(unit, i)
         if not buff or not buff.name then break end
-        if i == 1 then buffs = {} end
         buffs[buff.name] = buff
         i = i + 1
     end
@@ -200,25 +218,34 @@ function adapter:getCombatLogInfo()
     end
 end
 
-function adapter:getNumPrimaryProfessions()
-    if type(GetNumPrimaryProfessions) == 'function' then
-        return GetNumPrimaryProfessions()
-    else
-        local count = 0
-        if type(GetProfessions) == "function" then                              --pdb("using GetProfessions")
-            local p1, p2 = GetProfessions()                                     --pdb(p1, p2)
-            if p1 then count = count + 1 end
-            if p2 then count = count + 1 end
-        else -- Fallback (locale-sensitive best-effort)
-            for i = 1, GetNumSkillLines() do
-                local skillName, isHeader, _, skillRank = GetSkillLineInfo(i)
-                if not isHeader and skillRank > 0 and L.PRIMARY_PROFESSIONS[skillName] then
-                    count = count + 1
-                end
-            end
-        end                                                                     --pdb("GetProfessions not available")
-        return count
+function adapter:isSpellKnown(spellId)
+    if type(IsPlayerSpell) == "function" then -- present on modern & Wrath
+        return IsPlayerSpell(spellId)
+    elseif type(IsSpellKnown) == "function" then -- present on Classic/Wrath
+        return IsSpellKnown(spellId)
+    else -- Extremely old fallback (unlikely needed in Classic/WotLK)
+        local name = GetSpellInfo(spellId)
+        return name and IsUsableSpell(name) ~= nil
     end
+end
+
+-- Returns the number of primary professions & the number of secondary professions.
+function adapter:getNumProfessions()
+    local nPrimary = 0
+    for _, id in ipairs(PRIMARY_PROF_SPELLS) do
+        if adapter:isSpellKnown(id) then
+            nPrimary = nPrimary + 1
+        end
+    end
+
+    local nSecondary = 0
+    for _, id in ipairs(SECONDARY_PROF_SPELLS) do
+        if adapter:isSpellKnown(id) then
+            nSecondary = nSecondary + 1
+        end
+    end
+
+    return nPrimary, nSecondary
 end
 
 function adapter:after(delay, func)
