@@ -24,6 +24,7 @@ end
 local _initialized = false
 local _secondsSinceLastUpdate = 0
 local _lastErrorCount = 0
+local _waitingToCheckAll = false
 
 --[[
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -207,11 +208,11 @@ function ns:init()
     ns:initDB()
     adapter:after(2, function()
         if IronmanUserData.Suppress then
-            ns:success(L.init_checking_off_s(ns:colorText('ffd000', '/ironman on')))
+            ns:success(L.init_checking_off_s(ns:colorText('ffd000', '/iron on')))
         else
             ns:success(L.init_checking_on_n(IronmanUserData.Interval))
         end
-        ns:success(L.type_s_for_more_info(ns:colorText('ffd000', '/ironman')))
+        ns:success(L.type_s_for_more_info(ns:colorText('ffd000', '/iron')))
         _initialized = true
         ns:checkAll()
     end)
@@ -258,6 +259,8 @@ function ns:flash(text)
 end
 
 function ns:checkAllDelayed(nSeconds)
+    if _waitingToCheckAll then return end
+    _waitingToCheckAll = true
     nSeconds = nSeconds or 0.5
     adapter:after(nSeconds, ns.checkAll)
 end
@@ -281,6 +284,7 @@ function ns:checkAll()
     end
     _lastErrorCount = n
     _secondsSinceLastUpdate = 0
+    _waitingToCheckAll = false
 end
 
 function ns:checkDeath()

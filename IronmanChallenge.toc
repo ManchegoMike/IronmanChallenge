@@ -1,8 +1,8 @@
 ## Interface: 30300
-## Title: Ironman Challenge|cFF00FF00 2.0.0|r
+## Title: Ironman Challenge|cFF00FF00 2.0.1|r
 ## Author: ManchegoMike
 ## Notes: Hardcore, self-found, only white/gray gear, no talents, no primary profs, no potions/healthstones, no external buffs
-## Version: 2.0.0
+## Version: 2.0.1
 ## RequiredDeps:
 ## SavedVariablesPerCharacter: IronmanUserData
 
