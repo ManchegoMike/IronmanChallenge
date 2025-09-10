@@ -53,7 +53,7 @@ $action = {
 
             # Copy file
             Copy-Item $path -Destination (Join-Path $dest $name) -Force
-            Write-Host "Copied $name -> $dest"
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Copied $name -> $dest"
 
             # Update last copied timestamp
             $lastCopied[$path] = Get-Date
