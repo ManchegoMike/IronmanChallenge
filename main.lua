@@ -65,6 +65,91 @@ local FORBIDDEN_ITEMS = {
 --[[
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @@                                                                              @@
+@@  Map & minimap stuff                                                         @@
+@@                                                                              @@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+]]
+
+local worldMapFrame -- late-bound for safety across versions
+local minimapRoot   -- MinimapCluster (Classic/Wrath/Retail) or fallback to Minimap
+local _hookedToggleWorldMap
+
+local function getMapFrames()
+    if not worldMapFrame then
+        worldMapFrame = _G.WorldMapFrame or _G.WorldMapFrameBase or _G.UIWorldMapFrame
+    end
+    if not minimapRoot then
+        minimapRoot = _G.MinimapCluster or _G.Minimap
+    end
+end
+
+local function hideWorldMapImmediate()
+    if worldMapFrame and worldMapFrame:IsShown() then
+        worldMapFrame:Hide()
+    end
+end
+
+local function hideMinimapImmediate()
+    if minimapRoot and minimapRoot:IsShown() then
+        minimapRoot:Hide()
+    end
+end
+
+-- Guard World Map from being shown if nec.
+local function guardWorldMap()
+    if not worldMapFrame then return end
+    if not worldMapFrame._noMapsHooked then
+        worldMapFrame:HookScript("OnShow", function(self)
+            if not IronmanUserData.AllowMaps then
+                self:Hide()
+            end
+        end)
+        worldMapFrame._noMapsHooked = true
+    end
+end
+
+-- Guard Minimap from being shown if nec.
+local function guardMinimap()
+    if not minimapRoot then return end
+    if not minimapRoot._noMapsHooked then
+        minimapRoot:HookScript("OnShow", function(self)
+            if not IronmanUserData.AllowMaps then
+                self:Hide()
+            end
+        end)
+        minimapRoot._noMapsHooked = true
+    end
+end
+
+-- Classic/Wrath toggle key “M” calls this; Retail still defines it.
+-- We can’t prevent execution, but we can immediately re-hide.
+local function hookToggleWorldMap()
+    if _G.ToggleWorldMap and not _hookedToggleWorldMap then
+        hooksecurefunc("ToggleWorldMap", function()
+            if not IronmanUserData.AllowMaps then
+                hideWorldMapImmediate()
+            end
+        end)
+        _hookedToggleWorldMap = true
+    end
+end
+
+function initMaps()
+    -- Bind frames and hooks once the UI is ready.
+    getMapFrames()
+    guardWorldMap()
+    guardMinimap()
+    hookToggleWorldMap()
+    -- Apply initial state.
+    if not IronmanUserData.AllowMaps then
+        hideWorldMapImmediate()
+        hideMinimapImmediate()
+    end
+end
+
+--[[
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@                                                                              @@
 @@  Events                                                                      @@
 @@                                                                              @@
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -81,38 +166,54 @@ eventFrame:SetScript('OnUpdate', function(self, elapsed)
     end
 end)
 
-eventFrame:RegisterEvent("PLAYER_LOGIN");
-eventFrame:RegisterEvent("PLAYER_DEAD");
-eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED");
-eventFrame:RegisterEvent("BAG_UPDATE_DELAYED");
-eventFrame:RegisterEvent("UNIT_AURA")
-eventFrame:RegisterEvent("UNIT_PET")
-eventFrame:RegisterEvent("MAIL_SHOW")
-eventFrame:RegisterEvent("AUCTION_HOUSE_SHOW")
-eventFrame:RegisterEvent("LEARNED_SPELL_IN_TAB")
+-- This event handler table exclusively contains the all functions we use to process events for this lib.
+local EV = {}
 
+function EV:PLAYER_LOGIN()
+    ns:init()
+end
+
+function EV:PLAYER_DEAD()
+    ns:died()
+end
+
+function EV:BAG_UPDATE_DELAYED()
+    ns:checkAllDelayed()
+end
+
+function EV:UNIT_AURA()
+    ns:checkAllDelayed()
+end
+
+function EV:UNIT_PET()
+    ns:checkAllDelayed()
+end
+
+function EV:MAIL_SHOW()
+    ns:playSound(ERROR_SOUND_FILE)
+    ns:flash(L.err_no_mail)
+    ns:fail(L.err_no_mail)
+end
+
+function EV:AUCTION_HOUSE_SHOW()
+    ns:playSound(ERROR_SOUND_FILE)
+    ns:flash(L.err_no_ah)
+    ns:fail(L.err_no_ah)
+end
+
+function EV:LEARNED_SPELL_IN_TAB()
+    ns:checkAllDelayed()
+end
+
+-- Register all EV events.
+for name in pairs(EV) do
+    eventFrame:RegisterEvent(name)
+end
+
+-- Handle each EV event.
 eventFrame:SetScript("OnEvent", function(self, event, ...)
-    if event == 'PLAYER_LOGIN' then
-        ns:init()
-    elseif event == 'PLAYER_DEAD' then
-        ns:died()
-    elseif event == 'BAG_UPDATE_DELAYED' then
-        ns:checkAllDelayed()
-    elseif event == "UNIT_AURA" then
-        ns:checkAllDelayed()
-    elseif event == "UNIT_PET" then
-        ns:checkAllDelayed()
-    elseif event == "MAIL_SHOW" then
-        ns:playSound(ERROR_SOUND_FILE)
-        ns:flash(L.err_no_mail)
-        ns:fail(L.err_no_mail)
-    elseif event == "AUCTION_HOUSE_SHOW" then
-        ns:playSound(ERROR_SOUND_FILE)
-        ns:flash(L.err_no_ah)
-        ns:fail(L.err_no_ah)
-    elseif event == "LEARNED_SPELL_IN_TAB" then
-        ns:checkAllDelayed()
-    end
+    local func = EV[event]
+    if func then func(self, ...) end
 end)
 
 --[[
@@ -140,6 +241,8 @@ function ns:parseCommand(str)
         return
     end
 
+    -----
+
     p1, p2 = str:find("^on$")
     if p1 then
         IronmanUserData.Suppress = false
@@ -154,6 +257,44 @@ function ns:parseCommand(str)
         ns:success(L.checking_off)
         return
     end
+
+    -----
+
+    local function setMaps(tf)
+        if tf == nil then
+            IronmanUserData.AllowMaps = not IronmanUserData.AllowMaps
+        else
+            IronmanUserData.AllowMaps = tf
+        end
+        -- TODO MSL 2025-11-19: Change state of maps.
+        getMapFrames()
+        guardWorldMap()
+        guardMinimap()
+
+        if not IronmanUserData.AllowMaps then
+            hideWorldMapImmediate()
+            hideMinimapImmediate()
+        else
+            -- Allow showing again; hooks remain but are no-ops while disabled.
+            if minimapRoot then minimapRoot:Show() end
+        end
+        ns:success(IronmanUserData.AllowMaps and L.maps_on or L.maps_off)
+    end
+
+    p1, p2, match = str:find("^maps? *(%a*)$")
+    if p1 then
+        match = match:lower()
+        if match == 'on' then
+            setMaps(true)
+        elseif match == 'off' then
+            setMaps(false)
+        else
+            setMaps(nil)
+        end
+        return
+    end
+
+    -----
 
     local function setPets(tf)
         if tf == nil then
@@ -178,6 +319,33 @@ function ns:parseCommand(str)
         return
     end
 
+    -----
+
+    local function setTalents(tf)
+        if tf == nil then
+            IronmanUserData.AllowTalents = not IronmanUserData.AllowTalents
+        else
+            IronmanUserData.AllowTalents = tf
+        end
+        ns:success(IronmanUserData.AllowTalents and L.talents_on or L.talents_off)
+        ns:checkTalents()
+    end
+
+    p1, p2, match = str:find("^talents? *(%a*)$")
+    if p1 then
+        match = match:lower()
+        if match == 'on' then
+            setTalents(true)
+        elseif match == 'off' then
+            setTalents(false)
+        else
+            setTalents(nil)
+        end
+        return
+    end
+
+    -----
+
     local color = 'ffd000'
 
     local function currentlyOnOrOff(tf)
@@ -186,11 +354,11 @@ function ns:parseCommand(str)
 
     print(' ')
     print(ns:colorText('ff8000', L.title))
-    print(L.description)
-    print(' ')
-    print(ns:colorText(color, "/iron {N}")  .. " - " .. L.cmdln_n)
-    print(ns:colorText(color, "/iron on/off")  .. " - " .. L.cmdln_on_off .. currentlyOnOrOff(not IronmanUserData.Suppress))
-    print(ns:colorText(color, "/iron pet [on/off]")  .. " - " .. L.cmdln_pets .. currentlyOnOrOff(IronmanUserData.AllowPets))
+    print(ns:colorText(color, "/iron {N}") .. " - " .. L.cmdln_n)
+    print(ns:colorText(color, "/iron on/off") .. " - " .. L.cmdln_on_off .. currentlyOnOrOff(not IronmanUserData.Suppress))
+    print(ns:colorText(color, "/iron maps [on/off]") .. " - " .. L.cmdln_maps .. currentlyOnOrOff(IronmanUserData.AllowMaps))
+    print(ns:colorText(color, "/iron pets [on/off]") .. " - " .. L.cmdln_pets .. currentlyOnOrOff(IronmanUserData.AllowPets))
+    print(ns:colorText(color, "/iron talents [on/off]") .. " - " .. L.cmdln_talents .. currentlyOnOrOff(IronmanUserData.AllowTalents))
     print(' ')
     print(L.disclaimer)
     print(' ')
@@ -206,11 +374,12 @@ end
 
 function ns:init()
     ns:initDB()
+    initMaps()
+
     adapter:after(2, function()
+        ns:success(L.description())
         if IronmanUserData.Suppress then
-            ns:success(L.init_checking_off_s(ns:colorText('ffd000', '/iron on')))
-        else
-            ns:success(L.init_checking_on_n(IronmanUserData.Interval))
+            ns:success(L.checking_off_s(ns:colorText('ffd000', '/iron on')))
         end
         ns:success(L.type_s_for_more_info(ns:colorText('ffd000', '/iron')))
         _initialized = true
@@ -227,10 +396,12 @@ function ns:initDB(force)
     if force or not IronmanUserData then
         IronmanUserData = {}
     end
-    if IronmanUserData.DeathCount == nil then IronmanUserData.DeathCount = 0     end
-    if IronmanUserData.Interval   == nil then IronmanUserData.Interval   = 15    end
-    if IronmanUserData.Suppress   == nil then IronmanUserData.Suppress   = false end
-    if IronmanUserData.AllowPets  == nil then IronmanUserData.AllowPets  = false end
+    if IronmanUserData.DeathCount    == nil then IronmanUserData.DeathCount    = 0     end
+    if IronmanUserData.Interval      == nil then IronmanUserData.Interval      = 15    end
+    if IronmanUserData.Suppress      == nil then IronmanUserData.Suppress      = false end
+    if IronmanUserData.AllowPets     == nil then IronmanUserData.AllowPets     = false end
+    if IronmanUserData.AllowMaps     == nil then IronmanUserData.AllowMaps     = false end
+    if IronmanUserData.AllowTalents  == nil then IronmanUserData.AllowTalents  = false end
 end
 
 function ns:playSound(path)
@@ -276,6 +447,7 @@ function ns:checkAll()
     n = n + ns:checkProfessions()
     n = n + ns:checkPets()
     n = n + ns:checkBuffs()
+    n = n + ns:checkAddons()
     if n > 0 then
         if n > 1 then print(' ') end
         if _lastErrorCount == 0 then
@@ -343,11 +515,13 @@ function ns:checkInventory()
 end
 
 function ns:checkTalents()
-    for i = 1, GetNumTalentTabs() do
-        local _,_,_,_,points = GetTalentTabInfo(i)                              
-        if points and points > 0 then
-            ns:fail(L.err_reset_talents)
-            return 1
+    if not IronmanUserData.AllowTalents then
+        for i = 1, GetNumTalentTabs() do
+            local _,_,_,_,points = GetTalentTabInfo(i)
+            if points and points > 0 then
+                ns:fail(L.err_reset_talents)
+                return 1
+            end
         end
     end
     return 0
@@ -382,6 +556,19 @@ function ns:checkBuffs()
             errorcount = errorcount + 1
             ns:fail(L.err_buff_disallowed(name))
         end
+    end
+    return errorcount
+end
+
+function ns:checkAddons()
+    local errorcount = 0
+    if IsAddOnLoaded("ZygorGuidesViewer") or _G.ZygorGuidesViewer then
+        errorcount = errorcount + 1
+        ns:fail(L.err_unload_addon("Zygor"))
+    end
+    if IsAddOnLoaded("RestedXP") or IsAddOnLoaded("RXPGuides") or _G.RXPGuides or _G.RXPData then
+        errorcount = errorcount + 1
+        ns:fail(L.err_unload_addon("RestedXP"))
     end
     return errorcount
 end

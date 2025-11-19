@@ -67,24 +67,35 @@ ns["enUS"] = {
 
     title = "THE IRONMAN CHALLENGE",
     prefix = "IRONMAN: ",
-    description = "Hardcore, self-found (no auction house, no mail, no trading), only white or gray gear, no talents, no pets, no primary professions, no potions, no healthstones, no food or scroll buffs, no external buffs, self-buff spells are OK.",
+    description = function() return
+        "Hardcore, self-found, only white or gray gear, no primary professions, no potions, no healthstones, no food or scroll buffs, no external buffs" ..
+        (IronmanUserData.AllowMaps    and "" or ", no maps")    ..
+        (IronmanUserData.AllowTalents and "" or ", no talents") ..
+        (IronmanUserData.AllowPets    and "" or ", no pets")    ..
+        (IronmanUserData.AllowMaps    and ", maps OK"    or "") ..
+        (IronmanUserData.AllowTalents and ", talents OK" or "") ..
+        (IronmanUserData.AllowPets    and ", pets OK"    or "") ..
+        "." end,
     currently_on = "currently ON",
     currently_off = "currently OFF",
     cmdln_n = "Checks every {N} seconds (15 by default)",
     cmdln_on_off = "Start/stop periodic checking",
+    cmdln_maps = "Show/hide map & minimap",
     cmdln_pets = "Allow/forbid pets",
     cmdln_profs = "Allow/forbid secondary professions",
+    maps_on = "Pets are now allowed",
+    maps_off = "Pets are now forbidden",
     pets_on = "Pets are now allowed",
     pets_off = "Pets are now forbidden",
-    profs_on = "Secondary professions are now allowed",
-    profs_off = "Secondary professions are now forbidden",
+    talents_on = "Talents are now allowed",
+    talents_off = "Talents are now forbidden",
     disclaimer = "Due to the limited nature of the WoW API, it's difficult to determine whether a given buff is OK or not. If someone else buffs you, the addon can tell you about that; and it can tell you to remove scroll buffs. But it cannot warn you about buffs from alchemy. HOTs from other players are considered buffs, so it will warn you about those.",
     err_seconds_ij = function(i, j) return "Seconds must be between " .. i .. " and " .. j end,
     checking_every_n = function(n) return "Now checking every " .. n .. " seconds" end,
+    checking_off_s = function(s) return "Checking turned off, type " .. s .. " to turn it on" end,
+    checking_on_n = function(n) return "Checking every " .. n .. " seconds" end,
     checking_on = "Checking on",
     checking_off = "Checking off",
-    init_checking_off_s = function(s) return "Initialized, checking turned off, type " .. s .. " to turn it on" end,
-    init_checking_on_n = function(n) return "Initialized, checking every " .. n .. " seconds" end,
     type_s_for_more_info = function(s) return "Type " .. s .. " for more info" end,
     err_unequip_s_s = function(slotname, link) return "Unequip " .. slotname .. " slot " .. (link or '') end,
     err_unequip_enchanted_s_s = function(slotname, link) return "Unequip enchanted " .. slotname .. " slot " .. (link or '') end,
@@ -97,6 +108,7 @@ ns["enUS"] = {
     err_no_mail = "You cannot use mail",
     err_no_ah = "You cannot use the auction house",
     err_pet = "No pets allowed",
+    err_unload_addon = function(name) return "You must unload the \"" .. name .. "\" addon" end,
 }
 
 -- German
