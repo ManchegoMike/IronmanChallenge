@@ -277,7 +277,7 @@ function ns:checkAll()
     n = n + ns:checkPets()
     n = n + ns:checkBuffs()
     if n > 0 then
-        print(' ')
+        if n > 1 then print(' ') end
         if _lastErrorCount == 0 then
             ns:playSound(ERROR_SOUND_FILE)
         end
@@ -377,7 +377,6 @@ function ns:checkBuffs()
         local isSelf = (buff.caster and (buff.caster == "player" or buff.caster == "pet"))
         if not isSelf then
             errorcount = errorcount + 1
-            print(name)
             ns:fail(L.err_buff_external(name))
         elseif L.SCROLL_BUFFS[name] then
             errorcount = errorcount + 1
