@@ -66,9 +66,9 @@ ns["enUS"] = {
     SCROLL_BUFFS = { ["Well Fed"]=1, ["Spirit"]=1, ["Armor"]=1, ["Intellect"]=1, ["Agility"]=1, ["Stamina"]=1, ["Strength"]=1, },
 
     title = "THE IRONMAN CHALLENGE",
-    optional_rules = "OPTIONAL RULES",
+    optional_rules = "OPTIONAL RULES (PICK ONE OR NONE)",
     prefix = "IRONMAN: ",
-    description = function() return "Hardcore, self-found, only white or gray gear, no primary professions, no potions, no healthstones, no food or scroll buffs, no external buffs"
+    description = function() return "Hardcore, self-found, minimal addons, only white or gray gear, no primary professions, no potions or healthstones, no food or scroll buffs, no external buffs"
         .. (IronmanUserData.AllowPets    and "" or ", no pets")
         .. (IronmanUserData.AllowMaps    and "" or ", no maps")
         .. (IronmanUserData.AllowTalents and "" or ", no talents")
@@ -78,7 +78,8 @@ ns["enUS"] = {
         .. "." end,
     currently_on = "currently ON",
     currently_off = "currently OFF",
-    cmdln_n = "Checks every {N} seconds (15 by default)",
+    currently_n = function(n) return " (currently " .. n .. ")" end,
+    cmdln_n = "Checks every {N} seconds",
     cmdln_on_off = "Start/stop periodic checking",
     cmdln_maps = "Toggle map & minimap",
     cmdln_pets = "Toggle pets",
@@ -89,14 +90,13 @@ ns["enUS"] = {
     pets_off = "Pets are now forbidden",
     talents_on = "Talents are now allowed",
     talents_off = "Talents are now forbidden",
-    disclaimer = "Due to the limited nature of the WoW API, it's difficult to determine whether a given buff is OK or not. If someone else buffs you, the addon can tell you about that; and it can tell you to remove scroll buffs. But it cannot warn you about buffs from alchemy. HOTs from other players are considered buffs, so it will warn you about those.",
     err_seconds_ij = function(i, j) return "Seconds must be between " .. i .. " and " .. j end,
     checking_every_n = function(n) return "Now checking every " .. n .. " seconds" end,
-    checking_off_s = function(s) return "Checking turned off, type " .. s .. " to turn it on" end,
+    checking_off_s = function(s) return "Checking turned off, type " .. ns:colorCmd(s) .. " to turn it on" end,
     checking_on_n = function(n) return "Checking every " .. n .. " seconds" end,
     checking_on = "Checking on",
     checking_off = "Checking off",
-    type_s_for_more_info = function(s) return "Type " .. s .. " for more info" end,
+    type_s_for_more_info = function(s) return "Type " .. ns:colorCmd(s) .. " for more info" end,
     err_unequip_s_s = function(slotname, link) return "Unequip " .. slotname .. " slot " .. (link or '') end,
     err_unequip_enchanted_s_s = function(slotname, link) return "Unequip enchanted " .. slotname .. " slot " .. (link or '') end,
     err_you_cannot_use_s = function(link) return "You cannot use " .. link end,
@@ -108,7 +108,12 @@ ns["enUS"] = {
     err_no_mail = "You cannot use mail",
     err_no_ah = "You cannot use the auction house",
     err_pet = "No pets allowed",
+    err_cannot_disable_talents = "You cannot disable talents if you already have talents",
+    err_disable_maps = function(s) return "You must first disable maps - " .. ns:colorCmd(s) end,
+    err_disable_pets = function(s) return "You must first disable pets - " .. ns:colorCmd(s) end,
+    err_disable_talents = function(s) return "You must first disable talents - " .. ns:colorCmd(s) end,
     err_unload_addon = function(name) return "You must unload the \"" .. name .. "\" addon" end,
+    qol_addons_ok = 'Any addons that can enhance combat, modify unit frames, or give you extra information are forbidden. Quality-of-life addons like "Leatrix", "Bagnon", "Details" are OK.',
 }
 
 -- German

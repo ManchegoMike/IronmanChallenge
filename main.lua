@@ -25,6 +25,7 @@ local _initialized = false
 local _secondsSinceLastUpdate = 0
 local _lastErrorCount = 0
 local _waitingToCheckAll = false
+local _checkAddonsCount = 0
 
 --[[
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -155,55 +156,19 @@ end
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 ]]
 
-local eventFrame = CreateFrame('frame', ADDONNAME .. "_Events")
-
-eventFrame:SetScript('OnUpdate', function(self, elapsed)
-    if not _initialized then return end
-    _secondsSinceLastUpdate = _secondsSinceLastUpdate + elapsed
-    if _secondsSinceLastUpdate > IronmanUserData.Interval then
-        ns:checkAll()
-        _secondsSinceLastUpdate = 0
-    end
-end)
-
 -- This event handler table exclusively contains the all functions we use to process events for this lib.
-local EV = {}
+local EV = {
+    AUCTION_HOUSE_SHOW   = function() ns:warn(L.err_no_ah, true, true) end,
+    BAG_UPDATE_DELAYED   = function() ns:checkAllDelayed() end,
+    LEARNED_SPELL_IN_TAB = function() ns:checkAllDelayed() end,
+    MAIL_SHOW            = function() ns:warn(L.err_no_mail, true, true) end,
+    PLAYER_DEAD          = function() ns:died() end,
+    PLAYER_LOGIN         = function() ns:init() end,
+    UNIT_AURA            = function() ns:checkAllDelayed() end,
+    UNIT_PET             = function() ns:checkAllDelayed() end,
+}
 
-function EV:PLAYER_LOGIN()
-    ns:init()
-end
-
-function EV:PLAYER_DEAD()
-    ns:died()
-end
-
-function EV:BAG_UPDATE_DELAYED()
-    ns:checkAllDelayed()
-end
-
-function EV:UNIT_AURA()
-    ns:checkAllDelayed()
-end
-
-function EV:UNIT_PET()
-    ns:checkAllDelayed()
-end
-
-function EV:MAIL_SHOW()
-    ns:playSound(ERROR_SOUND_FILE)
-    ns:flash(L.err_no_mail)
-    ns:fail(L.err_no_mail)
-end
-
-function EV:AUCTION_HOUSE_SHOW()
-    ns:playSound(ERROR_SOUND_FILE)
-    ns:flash(L.err_no_ah)
-    ns:fail(L.err_no_ah)
-end
-
-function EV:LEARNED_SPELL_IN_TAB()
-    ns:checkAllDelayed()
-end
+local eventFrame = CreateFrame('frame', ADDONNAME .. "_Events")
 
 -- Register all EV events.
 for name in pairs(EV) do
@@ -214,6 +179,16 @@ end
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     local func = EV[event]
     if func then func(self, ...) end
+end)
+
+-- Function to be executed on each screen update.
+eventFrame:SetScript('OnUpdate', function(self, elapsed)
+    if not _initialized then return end
+    _secondsSinceLastUpdate = _secondsSinceLastUpdate + elapsed
+    if _secondsSinceLastUpdate > IronmanUserData.Interval then
+        ns:checkAll()
+        _secondsSinceLastUpdate = 0
+    end
 end)
 
 --[[
@@ -233,7 +208,7 @@ function ns:parseCommand(str)
     if p1 then
         local n = tonumber(match)
         if n < 15 or n > 300 then
-            ns:fail(L.err_seconds_ij(15, 300))
+            ns:warn(L.err_seconds_ij(15, 300))
             return
         end
         IronmanUserData.Interval = n
@@ -261,12 +236,21 @@ function ns:parseCommand(str)
     -----
 
     local function setMaps(tf)
-        if tf == nil then
-            IronmanUserData.AllowMaps = not IronmanUserData.AllowMaps
-        else
-            IronmanUserData.AllowMaps = tf
+        tf = tf or not IronmanUserData.AllowMaps
+
+        if tf then
+            if IronmanUserData.AllowPets then
+                ns:warn(L.err_disable_pets("/iron pets"))
+                return
+            end
+            if IronmanUserData.AllowTalents then
+                ns:warn(L.err_disable_talents("/iron talents"))
+                return
+            end
         end
-        -- TODO MSL 2025-11-19: Change state of maps.
+
+        IronmanUserData.AllowMaps = tf
+
         getMapFrames()
         guardWorldMap()
         guardMinimap()
@@ -299,11 +283,21 @@ function ns:parseCommand(str)
     -----
 
     local function setPets(tf)
-        if tf == nil then
-            IronmanUserData.AllowPets = not IronmanUserData.AllowPets
-        else
-            IronmanUserData.AllowPets = tf
+        tf = tf or not IronmanUserData.AllowPets
+
+        if tf then
+            if IronmanUserData.AllowMaps then
+                ns:warn(L.err_disable_maps("/iron maps"))
+                return
+            end
+            if IronmanUserData.AllowTalents then
+                ns:warn(L.err_disable_talents("/iron talents"))
+                return
+            end
         end
+
+        IronmanUserData.AllowPets = tf
+
         ns:success(IronmanUserData.AllowPets and L.pets_on or L.pets_off)
         ns:success(L.description())
         ns:checkPets()
@@ -326,11 +320,25 @@ function ns:parseCommand(str)
     -----
 
     local function setTalents(tf)
-        if tf == nil then
-            IronmanUserData.AllowTalents = not IronmanUserData.AllowTalents
+        tf = tf or not IronmanUserData.AllowTalents
+        if tf then
+            if IronmanUserData.AllowMaps then
+                ns:warn(L.err_disable_maps("/iron maps"))
+                return
+            end
+            if IronmanUserData.AllowPets then
+                ns:warn(L.err_disable_pets("/iron pets"))
+                return
+            end
         else
-            IronmanUserData.AllowTalents = tf
+            if ns:playerHasTalents() then
+                ns:warn(L.err_cannot_disable_talents)
+                return
+            end
         end
+
+        IronmanUserData.AllowTalents = tf
+
         ns:success(IronmanUserData.AllowTalents and L.talents_on or L.talents_off)
         ns:success(L.description())
         ns:checkTalents()
@@ -352,22 +360,19 @@ function ns:parseCommand(str)
 
     -----
 
-    local color = 'ffd000'
-
     local function currentlyOnOrOff(tf)
         return " (" .. (tf and L.currently_on or L.currently_off) .. ")"
     end
 
     print(' ')
     print(ns:colorText('ff8000', L.title))
-    print(ns:colorText(color, "/iron {N}") .. " - " .. L.cmdln_n)
-    print(ns:colorText(color, "/iron on/off") .. " - " .. L.cmdln_on_off .. currentlyOnOrOff(not IronmanUserData.Suppress))
-    print(ns:colorText('ff8000', L.optional_rules))
-    print(ns:colorText(color, "/iron maps [on/off]") .. " - " .. L.cmdln_maps .. currentlyOnOrOff(IronmanUserData.AllowMaps))
-    print(ns:colorText(color, "/iron pets [on/off]") .. " - " .. L.cmdln_pets .. currentlyOnOrOff(IronmanUserData.AllowPets))
-    print(ns:colorText(color, "/iron talents [on/off]") .. " - " .. L.cmdln_talents .. currentlyOnOrOff(IronmanUserData.AllowTalents))
+    print(ns:colorCmd("/iron {N}") .. " - " .. L.cmdln_n .. L.currently_n(IronmanUserData.Interval))
+    print(ns:colorCmd("/iron on/off") .. " - " .. L.cmdln_on_off .. currentlyOnOrOff(not IronmanUserData.Suppress))
     print(' ')
-    print(L.disclaimer)
+    print(ns:colorText('ff8000', L.optional_rules))
+    print(ns:colorCmd("/iron maps [on/off]") .. " - " .. L.cmdln_maps .. currentlyOnOrOff(IronmanUserData.AllowMaps))
+    print(ns:colorCmd("/iron pets [on/off]") .. " - " .. L.cmdln_pets .. currentlyOnOrOff(IronmanUserData.AllowPets))
+    print(ns:colorCmd("/iron talents [on/off]") .. " - " .. L.cmdln_talents .. currentlyOnOrOff(IronmanUserData.AllowTalents))
     print(' ')
 end
 
@@ -386,9 +391,9 @@ function ns:init()
     adapter:after(2, function()
         ns:success(L.description())
         if IronmanUserData.Suppress then
-            ns:success(L.checking_off_s(ns:colorText('ffd000', '/iron on')))
+            ns:success(L.checking_off_s('/iron on'))
         end
-        ns:success(L.type_s_for_more_info(ns:colorText('ffd000', '/iron')))
+        ns:success(L.type_s_for_more_info('/iron'))
         _initialized = true
         ns:checkAll()
     end)
@@ -420,12 +425,26 @@ function ns:colorText(hex6, text)
     return "|cFF" .. hex6 .. text .. "|r"
 end
 
+function ns:colorCmd(text)
+    return ns:colorText('ffd000', text)
+end
+
 function ns:info(text)
     print(ns:colorText('c0c0c0', L.prefix) .. ns:colorText('ffffff', text))
 end
 
-function ns:fail(text)
+function ns:warn(text, flash, sound)
     print(ns:colorText('ff0000', L.prefix) .. ns:colorText('ffffff', text))
+    if type(flash) == "string" then
+        ns:flash(flash)
+    elseif flash then
+        ns:flash(text)
+    end
+    if type(sound) == "string" then
+        ns:playSound(sound)
+    elseif sound then
+        ns:playSound(ERROR_SOUND_FILE)
+    end
 end
 
 function ns:success(text)
@@ -434,6 +453,16 @@ end
 
 function ns:flash(text)
     UIErrorsFrame:AddMessage(text, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8);
+end
+
+function ns:playerHasTalents()
+    for i = 1, GetNumTalentTabs() do
+        local _,_,_,_,points = GetTalentTabInfo(i)
+        if points and points > 0 then
+            return true
+        end
+    end
+    return false
 end
 
 function ns:checkAllDelayed(nSeconds)
@@ -472,7 +501,7 @@ function ns:checkDeath()
         count = IronmanUserData.DeathCount
     end
     if count > 0 then
-        ns:fail(L.err_you_died)
+        ns:warn(L.err_you_died)
     end
     return (count > 0 and 1 or 0)
 end
@@ -485,12 +514,12 @@ function ns:checkGear()
         local link = GetInventoryItemLink("player", id)
         if quality and quality > 1 then
             errorcount = errorcount + 1
-            ns:fail(L.err_unequip_s_s(slotname, link))
+            ns:warn(L.err_unequip_s_s(slotname, link))
         elseif link then
             local _, enchantId = link:match("item:(%d+):(%d+)")
             if enchantId and enchantId ~= "0" then
                 errorcount = errorcount + 1
-                ns:fail(L.err_unequip_enchanted_s_s(slotname, link))
+                ns:warn(L.err_unequip_enchanted_s_s(slotname, link))
             end
         end
     end
@@ -515,7 +544,7 @@ function ns:checkInventory()
         end
     end
     for _, link in pairs(foundLinks) do
-        ns:fail(L.err_you_cannot_use_s(link))
+        ns:warn(L.err_you_cannot_use_s(link))
         errorcount = errorcount + 1
     end
     return errorcount
@@ -523,12 +552,9 @@ end
 
 function ns:checkTalents()
     if not IronmanUserData.AllowTalents then
-        for i = 1, GetNumTalentTabs() do
-            local _,_,_,_,points = GetTalentTabInfo(i)
-            if points and points > 0 then
-                ns:fail(L.err_reset_talents)
-                return 1
-            end
+        if ns:playerHasTalents() then
+            ns:warn(L.err_reset_talents)
+            return 1
         end
     end
     return 0
@@ -537,7 +563,7 @@ end
 function ns:checkProfessions()
     local nPrimary, nSecondary = adapter:getNumProfessions()
     if nPrimary > 0 then
-        ns:fail(L.err_unlearn_n_profs(nPrimary))
+        ns:warn(L.err_unlearn_n_profs(nPrimary))
         return nPrimary
     end
     return 0
@@ -545,7 +571,7 @@ end
 
 function ns:checkPets()
     if UnitExists("pet") and not IronmanUserData.AllowPets then
-        ns:fail(L.err_pet)
+        ns:warn(L.err_pet)
         return 1
     end
     return 0
@@ -558,32 +584,153 @@ function ns:checkBuffs()
         local isSelf = (buff.caster and (buff.caster == "player" or buff.caster == "pet"))
         if not isSelf then
             errorcount = errorcount + 1
-            ns:fail(L.err_buff_external(name))
+            ns:warn(L.err_buff_external(name))
         elseif L.SCROLL_BUFFS[name] then
             errorcount = errorcount + 1
-            ns:fail(L.err_buff_disallowed(name))
+            ns:warn(L.err_buff_disallowed(name))
         end
     end
     return errorcount
 end
 
 function ns:checkAddons()
+    -- We only perform this check 1 in 10 times.
+    _checkAddonsCount = _checkAddonsCount + 1
+    if _checkAddonsCount % 10 ~= 1 then return 0 end
+
     local errorcount = 0
+
     if IsAddOnLoaded("Questie") or _G.Questie then
         errorcount = errorcount + 1
-        ns:fail(L.err_unload_addon("Questie"))
+        ns:warn(L.err_unload_addon("Questie"))
     end
-    if IsAddOnLoaded("WeakAuras") or _G.WeakAuras then
+    if IsAddOnLoaded("Leatrix_Maps") or _G.LeatrixMaps then
         errorcount = errorcount + 1
-        ns:fail(L.err_unload_addon("WeakAuras"))
+        ns:warn(L.err_unload_addon("Leatrix Maps"))
+    end
+    if IsAddOnLoaded("Leatrix_Sounds") or _G.LeatrixSounds then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Leatrix Sounds"))
     end
     if IsAddOnLoaded("ZygorGuidesViewer") or _G.ZygorGuidesViewer then
         errorcount = errorcount + 1
-        ns:fail(L.err_unload_addon("Zygor"))
+        ns:warn(L.err_unload_addon("Zygor Guides"))
     end
-    if IsAddOnLoaded("RestedXP") or IsAddOnLoaded("RXPGuides") or _G.RXPGuides or _G.RXPData then
+    if IsAddOnLoaded("RestedXP") or _G.RXPData or _G.RXPGuides then
         errorcount = errorcount + 1
-        ns:fail(L.err_unload_addon("RestedXP"))
+        ns:warn(L.err_unload_addon("RestedXP"))
+    end
+    if IsAddOnLoaded("RXPGuides") or _G.RXPGuides then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("RXPGuides"))
+    end
+    if IsAddOnLoaded("ElvUI") or _G.ElvUI then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("ElvUI"))
+    end
+    if IsAddOnLoaded("WeakAuras") or _G.WeakAuras then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("WeakAuras"))
+    end
+    if IsAddOnLoaded("DBM-Core") or IsAddOnLoaded("DBM-Classic") or _G.DBM then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Deadly Boss Mods"))
+    end
+    if IsAddOnLoaded("BigWigs") or IsAddOnLoaded("BigWigs_Classic") or _G.BigWigs then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("BigWigs"))
+    end
+    if IsAddOnLoaded("TidyPlates_ThreatPlates") or _G.ThreatPlates then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Threat Plates"))
+    end
+    if IsAddOnLoaded("Plater") or _G.Plater then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Plater Nameplates"))
+    end
+    if IsAddOnLoaded("Kui_Nameplates") or _G.KuiNameplatesCore then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("KuiNameplates"))
+    end
+    if IsAddOnLoaded("ShadowedUnitFrames") or _G.ShadowUF or _G.ShadowedUF then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Shadowed Unit Frames"))
+    end
+    if IsAddOnLoaded("ZPerl") or IsAddOnLoaded("XPerl") or _G.ZPerl or _G.XPerl then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("ZPerl/XPerl"))
+    end
+    if IsAddOnLoaded("LunaUnitFrames") or _G.LunaUnitFrames then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Luna Unit Frames"))
+    end
+    if IsAddOnLoaded("Grid2") or _G.Grid2 then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Grid2"))
+    end
+    if IsAddOnLoaded("VuhDo") or _G.VUHDO_GLOBAL or _G.VuhDo then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("VuhDo"))
+    end
+    if IsAddOnLoaded("HealBot") or _G.HealBot then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("HealBot"))
+    end
+    if IsAddOnLoaded("Clique") or _G.Clique then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Clique"))
+    end
+    if IsAddOnLoaded("ClassicCastbars") or _G.ClassicCastbars then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("ClassicCastbars"))
+    end
+    if IsAddOnLoaded("ClassicAuraDurations") or _G.ClassicAuraDurations then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Classic Aura Durations"))
+    end
+    if IsAddOnLoaded("RealMobHealth") or _G.RealMobHealth then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("RealMobHealth"))
+    end
+    if IsAddOnLoaded("TomTom") or _G.TomTom then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("TomTom"))
+    end
+    if IsAddOnLoaded("NovaWorldBuffs") or _G.NWB then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("NovaWorldBuffs"))
+    end
+    if IsAddOnLoaded("NovaRaidCompanion") or _G.NRC then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("NovaRaidCompanion"))
+    end
+    if IsAddOnLoaded("RCLootCouncil_Classic") or _G.RCLootCouncil then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("RCLootCouncil Classic"))
+    end
+    if IsAddOnLoaded("ThreatClassic2") or _G.ThreatClassic2 or _G.tc2 then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("ThreatClassic2"))
+    end
+    if IsAddOnLoaded("WeaponSwingTimer") or _G.WeaponSwingTimer then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("WeaponSwingTimer"))
+    end
+    if IsAddOnLoaded("ClassicSwingTimer") or _G.ClassicSwingTimer then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Classic Swing Timer"))
+    end
+    if IsAddOnLoaded("Postal") or _G.Postal then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Postal"))
+    end
+    if IsAddOnLoaded("Pawn") or _G.Pawn then
+        errorcount = errorcount + 1
+        ns:warn(L.err_unload_addon("Pawn"))
+    end
+
+    if errorcount > 0 then
+        ns:warn(L.qol_addons_ok)
     end
     return errorcount
 end
