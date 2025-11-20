@@ -70,54 +70,54 @@ local FORBIDDEN_ITEMS = {
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 ]]
 
-local worldMapFrame -- late-bound for safety across versions
-local minimapRoot   -- MinimapCluster (Classic/Wrath/Retail) or fallback to Minimap
+local _worldMapFrame -- late-bound for safety across versions
+local _minimapRoot   -- MinimapCluster (Classic/Wrath/Retail) or fallback to Minimap
 local _hookedToggleWorldMap
 
 local function getMapFrames()
-    if not worldMapFrame then
-        worldMapFrame = _G.WorldMapFrame or _G.WorldMapFrameBase or _G.UIWorldMapFrame
+    if not _worldMapFrame then
+        _worldMapFrame = _G._WorldMapFrame or _G._WorldMapFrameBase or _G.UI_WorldMapFrame
     end
-    if not minimapRoot then
-        minimapRoot = _G.MinimapCluster or _G.Minimap
+    if not _minimapRoot then
+        _minimapRoot = _G.MinimapCluster or _G.Minimap
     end
 end
 
 local function hideWorldMapImmediate()
-    if worldMapFrame and worldMapFrame:IsShown() then
-        worldMapFrame:Hide()
+    if _worldMapFrame and _worldMapFrame:IsShown() then
+        _worldMapFrame:Hide()
     end
 end
 
 local function hideMinimapImmediate()
-    if minimapRoot and minimapRoot:IsShown() then
-        minimapRoot:Hide()
+    if _minimapRoot and _minimapRoot:IsShown() then
+        _minimapRoot:Hide()
     end
 end
 
 -- Guard World Map from being shown if nec.
 local function guardWorldMap()
-    if not worldMapFrame then return end
-    if not worldMapFrame._noMapsHooked then
-        worldMapFrame:HookScript("OnShow", function(self)
+    if not _worldMapFrame then return end
+    if not _worldMapFrame._noMapsHooked then
+        _worldMapFrame:HookScript("OnShow", function(self)
             if not IronmanUserData.AllowMaps then
                 self:Hide()
             end
         end)
-        worldMapFrame._noMapsHooked = true
+        _worldMapFrame._noMapsHooked = true
     end
 end
 
 -- Guard Minimap from being shown if nec.
 local function guardMinimap()
-    if not minimapRoot then return end
-    if not minimapRoot._noMapsHooked then
-        minimapRoot:HookScript("OnShow", function(self)
+    if not _minimapRoot then return end
+    if not _minimapRoot._noMapsHooked then
+        _minimapRoot:HookScript("OnShow", function(self)
             if not IronmanUserData.AllowMaps then
                 self:Hide()
             end
         end)
-        minimapRoot._noMapsHooked = true
+        _minimapRoot._noMapsHooked = true
     end
 end
 
@@ -134,7 +134,7 @@ local function hookToggleWorldMap()
     end
 end
 
-function initMaps()
+local function initMaps()
     -- Bind frames and hooks once the UI is ready.
     getMapFrames()
     guardWorldMap()
@@ -276,9 +276,11 @@ function ns:parseCommand(str)
             hideMinimapImmediate()
         else
             -- Allow showing again; hooks remain but are no-ops while disabled.
-            if minimapRoot then minimapRoot:Show() end
+            if _minimapRoot then _minimapRoot:Show() end
         end
         ns:success(IronmanUserData.AllowMaps and L.maps_on or L.maps_off)
+        ns:success(L.description())
+        print(" ")
     end
 
     p1, p2, match = str:find("^maps? *(%a*)$")
@@ -303,7 +305,9 @@ function ns:parseCommand(str)
             IronmanUserData.AllowPets = tf
         end
         ns:success(IronmanUserData.AllowPets and L.pets_on or L.pets_off)
+        ns:success(L.description())
         ns:checkPets()
+        print(" ")
     end
 
     p1, p2, match = str:find("^pets? *(%a*)$")
@@ -328,7 +332,9 @@ function ns:parseCommand(str)
             IronmanUserData.AllowTalents = tf
         end
         ns:success(IronmanUserData.AllowTalents and L.talents_on or L.talents_off)
+        ns:success(L.description())
         ns:checkTalents()
+        print(" ")
     end
 
     p1, p2, match = str:find("^talents? *(%a*)$")
@@ -356,6 +362,7 @@ function ns:parseCommand(str)
     print(ns:colorText('ff8000', L.title))
     print(ns:colorText(color, "/iron {N}") .. " - " .. L.cmdln_n)
     print(ns:colorText(color, "/iron on/off") .. " - " .. L.cmdln_on_off .. currentlyOnOrOff(not IronmanUserData.Suppress))
+    print(ns:colorText('ff8000', L.optional_rules))
     print(ns:colorText(color, "/iron maps [on/off]") .. " - " .. L.cmdln_maps .. currentlyOnOrOff(IronmanUserData.AllowMaps))
     print(ns:colorText(color, "/iron pets [on/off]") .. " - " .. L.cmdln_pets .. currentlyOnOrOff(IronmanUserData.AllowPets))
     print(ns:colorText(color, "/iron talents [on/off]") .. " - " .. L.cmdln_talents .. currentlyOnOrOff(IronmanUserData.AllowTalents))
@@ -562,6 +569,14 @@ end
 
 function ns:checkAddons()
     local errorcount = 0
+    if IsAddOnLoaded("Questie") or _G.Questie then
+        errorcount = errorcount + 1
+        ns:fail(L.err_unload_addon("Questie"))
+    end
+    if IsAddOnLoaded("WeakAuras") or _G.WeakAuras then
+        errorcount = errorcount + 1
+        ns:fail(L.err_unload_addon("WeakAuras"))
+    end
     if IsAddOnLoaded("ZygorGuidesViewer") or _G.ZygorGuidesViewer then
         errorcount = errorcount + 1
         ns:fail(L.err_unload_addon("Zygor"))

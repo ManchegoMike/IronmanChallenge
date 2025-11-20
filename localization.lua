@@ -66,25 +66,25 @@ ns["enUS"] = {
     SCROLL_BUFFS = { ["Well Fed"]=1, ["Spirit"]=1, ["Armor"]=1, ["Intellect"]=1, ["Agility"]=1, ["Stamina"]=1, ["Strength"]=1, },
 
     title = "THE IRONMAN CHALLENGE",
+    optional_rules = "OPTIONAL RULES",
     prefix = "IRONMAN: ",
-    description = function() return
-        "Hardcore, self-found, only white or gray gear, no primary professions, no potions, no healthstones, no food or scroll buffs, no external buffs" ..
-        (IronmanUserData.AllowMaps    and "" or ", no maps")    ..
-        (IronmanUserData.AllowTalents and "" or ", no talents") ..
-        (IronmanUserData.AllowPets    and "" or ", no pets")    ..
-        (IronmanUserData.AllowMaps    and ", maps OK"    or "") ..
-        (IronmanUserData.AllowTalents and ", talents OK" or "") ..
-        (IronmanUserData.AllowPets    and ", pets OK"    or "") ..
-        "." end,
+    description = function() return "Hardcore, self-found, only white or gray gear, no primary professions, no potions, no healthstones, no food or scroll buffs, no external buffs"
+        .. (IronmanUserData.AllowPets    and "" or ", no pets")
+        .. (IronmanUserData.AllowMaps    and "" or ", no maps")
+        .. (IronmanUserData.AllowTalents and "" or ", no talents")
+        .. (IronmanUserData.AllowPets    and ", pets OK"    or "")
+        .. (IronmanUserData.AllowMaps    and ", maps OK"    or "")
+        .. (IronmanUserData.AllowTalents and ", talents OK" or "")
+        .. "." end,
     currently_on = "currently ON",
     currently_off = "currently OFF",
     cmdln_n = "Checks every {N} seconds (15 by default)",
     cmdln_on_off = "Start/stop periodic checking",
-    cmdln_maps = "Show/hide map & minimap",
-    cmdln_pets = "Allow/forbid pets",
-    cmdln_profs = "Allow/forbid secondary professions",
-    maps_on = "Pets are now allowed",
-    maps_off = "Pets are now forbidden",
+    cmdln_maps = "Toggle map & minimap",
+    cmdln_pets = "Toggle pets",
+    cmdln_talents = "Toggle talents",
+    maps_on = "Maps are now allowed",
+    maps_off = "Maps are now hidden",
     pets_on = "Pets are now allowed",
     pets_off = "Pets are now forbidden",
     talents_on = "Talents are now allowed",
