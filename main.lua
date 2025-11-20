@@ -473,8 +473,7 @@ function ns:checkAllDelayed(nSeconds)
 end
 
 function ns:checkAll()
-    if not _initialized then return end
-    if IronmanUserData.Suppress then return end
+    if not _initialized or IronmanUserData.Suppress or UnitIsDeadOrGhost("player") then return end
     local n = 0
     n = n + ns:checkDeath()
     n = n + ns:checkGear()
